@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "id": "sqrt_newton",
+  "version": "1.0.0",
+  "description": "Approximates the square root of n with Newton's method; stops when two guesses differ by less than tolerance.",
+  "inputs": [
+    {"name": "n", "type": "number", "description": "A positive number."},
+    {"name": "tolerance", "type": "number", "required": false, "default": 1.0e-9}
+  ],
+  "nodes": [
+    {
+      "id": "newton",
+      "kind": "loop",
+      "max_iterations": 50,
+      "state": {"object": {"x": {"input": "n"}}},
+      "nodes": [
+        {
+          "id": "quotient",
+          "kind": "action",
+          "capability": {"name": "math.divide", "version": "~> 1.0"},
+          "args": {"a": {"input": "n"}, "b": {"loop": "state", "of": "newton", "path": ["x"]}}
+        },
+        {
+          "id": "sum",
+          "kind": "action",
+          "capability": {"name": "math.add", "version": "~> 1.0"},
+          "args": {"a": {"loop": "state", "of": "newton", "path": ["x"]}, "b": {"result": "quotient"}}
+        },
+        {
+          "id": "guess",
+          "kind": "action",
+          "capability": {"name": "math.divide", "version": "~> 1.0"},
+          "args": {"a": {"result": "sum"}, "b": {"value": 2}}
+        },
+        {
+          "id": "delta",
+          "kind": "action",
+          "capability": {"name": "math.subtract", "version": "~> 1.0"},
+          "args": {"a": {"loop": "state", "of": "newton", "path": ["x"]}, "b": {"result": "guess"}}
+        },
+        {
+          "id": "distance",
+          "kind": "action",
+          "capability": {"name": "math.abs", "version": "~> 1.0"},
+          "args": {"value": {"result": "delta"}}
+        },
+        {
+          "id": "converged",
+          "kind": "action",
+          "capability": {"name": "math.less_than", "version": "~> 1.0"},
+          "args": {"a": {"result": "distance"}, "b": {"input": "tolerance"}}
+        }
+      ],
+      "next_state": {"object": {"x": {"result": "guess"}}},
+      "until": {"result": "converged"}
+    }
+  ],
+  "output": {"result": "newton", "path": ["x"]}
+}

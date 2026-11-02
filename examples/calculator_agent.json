@@ -1,0 +1,208 @@
+{
+  "description": "ReAct-style loop that applies a plan of math tools to a starting value.",
+  "id": "calculator_agent",
+  "inputs": [
+    {
+      "name": "start",
+      "required": true,
+      "type": "number"
+    },
+    {
+      "name": "plan",
+      "required": true,
+      "type": "list"
+    },
+    {
+      "default": 3,
+      "description": "Scratchpad window size.",
+      "name": "keep",
+      "required": false,
+      "type": "integer"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "agent",
+      "kind": "loop",
+      "max_iterations": 20,
+      "next_state": {
+        "object": {
+          "scratchpad": {
+            "result": "note"
+          },
+          "value": {
+            "result": "act"
+          }
+        }
+      },
+      "nodes": [
+        {
+          "args": {
+            "plan": {
+              "input": "plan"
+            },
+            "step": {
+              "loop": "index",
+              "of": "agent"
+            },
+            "value": {
+              "loop": "state",
+              "of": "agent",
+              "path": [
+                "value"
+              ]
+            }
+          },
+          "capability": {
+            "name": "agent.scripted_policy",
+            "version": "~> 1.0"
+          },
+          "id": "decide",
+          "kind": "action",
+          "max_attempts": 1
+        },
+        {
+          "cases": [
+            {
+              "match": "add",
+              "nodes": [
+                {
+                  "args": {
+                    "a": {
+                      "loop": "state",
+                      "of": "agent",
+                      "path": [
+                        "value"
+                      ]
+                    },
+                    "b": {
+                      "path": [
+                        "operand"
+                      ],
+                      "result": "decide"
+                    }
+                  },
+                  "capability": {
+                    "name": "math.add",
+                    "version": "~> 1.0"
+                  },
+                  "id": "add",
+                  "kind": "action",
+                  "max_attempts": 1
+                }
+              ],
+              "output": {
+                "result": "add"
+              }
+            },
+            {
+              "match": "multiply",
+              "nodes": [
+                {
+                  "args": {
+                    "a": {
+                      "loop": "state",
+                      "of": "agent",
+                      "path": [
+                        "value"
+                      ]
+                    },
+                    "b": {
+                      "path": [
+                        "operand"
+                      ],
+                      "result": "decide"
+                    }
+                  },
+                  "capability": {
+                    "name": "math.multiply",
+                    "version": "~> 1.0"
+                  },
+                  "id": "multiply",
+                  "kind": "action",
+                  "max_attempts": 1
+                }
+              ],
+              "output": {
+                "result": "multiply"
+              }
+            }
+          ],
+          "default": {
+            "nodes": [],
+            "output": {
+              "loop": "state",
+              "of": "agent",
+              "path": [
+                "value"
+              ]
+            }
+          },
+          "id": "act",
+          "kind": "branch",
+          "on": {
+            "path": [
+              "tool"
+            ],
+            "result": "decide"
+          }
+        },
+        {
+          "args": {
+            "item": {
+              "object": {
+                "observation": {
+                  "result": "act"
+                },
+                "thought": {
+                  "path": [
+                    "thought"
+                  ],
+                  "result": "decide"
+                }
+              }
+            },
+            "keep": {
+              "input": "keep"
+            },
+            "list": {
+              "loop": "state",
+              "of": "agent",
+              "path": [
+                "scratchpad"
+              ]
+            }
+          },
+          "capability": {
+            "name": "list.append_window",
+            "version": "~> 1.0"
+          },
+          "id": "note",
+          "kind": "action",
+          "max_attempts": 1
+        }
+      ],
+      "state": {
+        "object": {
+          "scratchpad": {
+            "value": []
+          },
+          "value": {
+            "input": "start"
+          }
+        }
+      },
+      "until": {
+        "path": [
+          "done"
+        ],
+        "result": "decide"
+      }
+    }
+  ],
+  "output": {
+    "result": "agent"
+  },
+  "schema_version": 1,
+  "version": "1.0.0"
+}

@@ -1,0 +1,62 @@
+{
+  "description": "Shouts a name and greets it.",
+  "id": "greeting",
+  "inputs": [
+    {
+      "name": "name",
+      "required": true,
+      "type": "string"
+    },
+    {
+      "default": "!",
+      "name": "punctuation",
+      "required": false,
+      "type": "string"
+    }
+  ],
+  "nodes": [
+    {
+      "args": {
+        "text": {
+          "input": "name"
+        }
+      },
+      "capability": {
+        "name": "text.upcase",
+        "version": "~> 1.0"
+      },
+      "id": "shout",
+      "kind": "action",
+      "max_attempts": 1
+    },
+    {
+      "args": {
+        "template": {
+          "value": "Hello, {{name}}{{punctuation}}"
+        },
+        "vars": {
+          "object": {
+            "name": {
+              "result": "shout"
+            },
+            "punctuation": {
+              "input": "punctuation"
+            }
+          }
+        }
+      },
+      "capability": {
+        "name": "text.template",
+        "version": "~> 1.0"
+      },
+      "id": "greet",
+      "kind": "action",
+      "max_attempts": 1
+    }
+  ],
+  "output": {
+    "result": "greet"
+  },
+  "schema_version": 1,
+  "version": "1.0.0"
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "ticket_triage",
+  "version": "1.0.0",
+  "description": "Routes a support ticket: urgent tickets are escalated, the rest acknowledged.",
+  "inputs": [
+    {"name": "text", "type": "string"}
+  ],
+  "nodes": [
+    {
+      "id": "urgent",
+      "kind": "action",
+      "capability": {"name": "text.contains", "version": "~> 1.0"},
+      "args": {"text": {"input": "text"}, "pattern": {"value": "urgent"}}
+    },
+    {
+      "id": "route",
+      "kind": "branch",
+      "on": {"result": "urgent"},
+      "cases": [
+        {
+          "match": true,
+          "nodes": [
+            {
+              "id": "alert",
+              "kind": "action",
+              "capability": {"name": "text.template", "version": "~> 1.0"},
+              "args": {
+                "template": {"value": "escalated to on-call: {{text}}"},
+                "vars": {"object": {"text": {"input": "text"}}}
+              }
+            },
+            {
+              "id": "escalate",
+              "kind": "action",
+              "capability": {"name": "text.upcase", "version": "~> 1.0"},
+              "args": {"text": {"result": "alert"}}
+            }
+          ],
+          "output": {"result": "escalate"}
+        }
+      ],
+      "default": {
+        "nodes": [
+          {
+            "id": "acknowledge",
+            "kind": "action",
+            "capability": {"name": "text.template", "version": "~> 1.0"},
+            "args": {
+              "template": {"value": "Thanks! We will reply within a day: {{text}}"},
+              "vars": {"object": {"text": {"input": "text"}}}
+            }
+          }
+        ],
+        "output": {"result": "acknowledge"}
+      }
+    }
+  ],
+  "output": {"object": {"urgent": {"result": "urgent"}, "reply": {"result": "route"}}}
+}

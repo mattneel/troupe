@@ -1,20 +1,15 @@
 defmodule Troupe.Application do
-  # See https://hexdocs.pm/elixir/Application.html
-  # for more information on OTP Applications
   @moduledoc false
 
   use Application
 
   @impl true
   def start(_type, _args) do
-    children = [
-      # Starts a worker by calling: Troupe.Worker.start_link(arg)
-      # {Troupe.Worker, arg}
-    ]
+    # The playground server only runs inside the Popcorn browser VM, where
+    # JavaScript reaches it through Popcorn.Proxy. As a library, Troupe starts
+    # no processes.
+    children = if Popcorn.JS.available?(), do: [Troupe.Playground], else: []
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: Troupe.Supervisor]
-    Supervisor.start_link(children, opts)
+    Supervisor.start_link(children, strategy: :one_for_one, name: Troupe.Supervisor)
   end
 end

@@ -7,8 +7,9 @@ defmodule Troupe.MixProject do
       version: "0.1.0",
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
+      elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
-      dialyzer: [plt_add_apps: [:ex_unit]],
+      dialyzer: [plt_add_apps: [:ex_unit, :mix]],
       aliases: aliases()
     ]
   end
@@ -20,6 +21,9 @@ defmodule Troupe.MixProject do
       mod: {Troupe.Application, []}
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
 
   def cli do
     [
@@ -40,6 +44,7 @@ defmodule Troupe.MixProject do
       {:spark, "~> 2.0"},
       {:reactor, "~> 1.0"},
       {:vibe_kit, "~> 0.1"},
+      {:jason, "~> 1.4"},
       {:igniter, "~> 0.6", only: [:dev, :test]}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
