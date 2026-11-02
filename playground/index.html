@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Troupe playground</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script src="./coi-serviceworker.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Troupe playground</h1>
+      <p id="vm-status" role="status">Booting the Elixir VM (Popcorn)…</p>
+    </header>
+
+    <main>
+      <section aria-labelledby="definition-heading">
+        <h2 id="definition-heading">Definition</h2>
+        <label for="example">Example</label>
+        <select id="example" disabled></select>
+        <p id="example-source" class="hint"></p>
+
+        <label for="definition">Workflow JSON (edit freely; loading or editing grants nothing)</label>
+        <textarea id="definition" spellcheck="false" rows="24"></textarea>
+
+        <div class="buttons">
+          <button id="validate" disabled>Validate</button>
+          <button id="canonical" disabled>Canonicalize</button>
+        </div>
+
+        <div id="validation" aria-live="polite"></div>
+
+        <h3>Export</h3>
+        <div class="buttons">
+          <button id="export-json" disabled>Download JSON</button>
+          <button id="export-etf" disabled>Term binary (base64)</button>
+          <button id="export-elixir" disabled>Use in an app</button>
+        </div>
+        <pre id="export-output" class="output"></pre>
+      </section>
+
+      <section aria-labelledby="run-heading">
+        <h2 id="run-heading">Run</h2>
+        <label for="inputs">Inputs (JSON)</label>
+        <textarea id="inputs" spellcheck="false" rows="6"></textarea>
+
+        <fieldset id="grants">
+          <legend>Grant capabilities (required to run)</legend>
+          <p class="hint">Validate to list the capabilities this definition uses.</p>
+        </fieldset>
+
+        <label for="interrupt">Interrupt after N completed actions (0 = run to the end)</label>
+        <input id="interrupt" type="number" min="0" value="0" />
+
+        <div class="buttons">
+          <button id="run" disabled>Run</button>
+          <button id="resume" disabled>Resume last run</button>
+        </div>
+
+        <p id="run-status" aria-live="polite"></p>
+        <h3>Output</h3>
+        <pre id="output" class="output"></pre>
+
+        <h3>Steps</h3>
+        <table id="steps">
+          <thead>
+            <tr><th>Activation</th><th>Node</th><th>Attempts</th><th>Status</th><th>Result</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <h3>Loop state between iterations</h3>
+        <table id="loops">
+          <thead>
+            <tr><th>Loop</th><th>Iteration</th><th>Next state</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <h3>Store</h3>
+        <pre id="stats" class="output"></pre>
+
+        <details>
+          <summary>History events</summary>
+          <pre id="events" class="output"></pre>
+        </details>
+      </section>
+    </main>
+
+    <pre id="selftest" hidden></pre>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
