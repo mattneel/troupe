@@ -256,6 +256,9 @@ async function main() {
   }
 
   popcorn = await Popcorn.init({
+    // Remote hosts (GitHub Pages) can take well over the 10 s default to
+    // deliver the VM and OTP archives on a first, uncached visit.
+    timeoutsMs: { boot: 180000, appStartup: 180000 },
     onStdout: (text) => console.log(text),
     onStderr: (text) => console.warn(text),
   });
