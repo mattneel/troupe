@@ -1,0 +1,84 @@
+# Builds the Popcorn playground and publishes it to GitHub Pages.
+#
+# One-time repository setup: Settings → Pages → Build and deployment →
+# Source: "GitHub Actions".
+#
+# GitHub Pages cannot send the COOP/COEP headers Popcorn needs, so the site
+# ships playground/coi-serviceworker.js, which adds them client-side. The
+# build job serves the assembled site without those headers and runs the
+# in-page self-test in headless Chrome before anything is deployed.
+name: Playground
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      # Popcorn 1.0's browser VM is OTP 29 and cooking needs the same OTP major.
+      MIX_ENV: wasm
+      TROUPE_OTP29: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29"
+          elixir-version: "1.20.2"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Cache deps and wasm build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build/wasm
+          key: playground-${{ runner.os }}-otp29-${{ hashFiles('mix.lock') }}
+
+      - run: mix deps.get
+
+      - name: Cook Troupe for the browser
+        run: ./playground/build.sh
+
+      - name: Assemble site
+        run: ./playground/site.sh _site
+
+      - name: Self-test the site as GitHub Pages serves it (no COOP/COEP headers)
+        run: |
+          python3 -m http.server 4010 --bind 127.0.0.1 --directory _site &
+          server=$!
+          trap 'kill $server' EXIT
+          sleep 1
+          CHROME_PATH="$(command -v google-chrome)" node playground/selftest.mjs http://127.0.0.1:4010/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
