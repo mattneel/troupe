@@ -5,20 +5,26 @@ defmodule Troupe.Playground do
   `Popcorn.Proxy`; on the host it is an ordinary GenServer, which is how its
   tests drive it.
 
-  Every request is a list and every reply a JSON string:
+  Every request is a list and every reply a JSON string. Definitions arrive
+  as `[format, text]`, where format is `"elixir"` (the `Troupe.Workflow` DSL,
+  read by `Troupe.Workflow.Source` without evaluation) or `"json"`. Both decode
+  to the same `Troupe.Definition`.
 
-    * `["init"]` — examples (with JSON text, sample inputs and grants) and the
-      installed capability catalog
-    * `["validate", json]` — canonical JSON, a node outline and required
-      capabilities, or every validation error with its JSON pointer
-    * `["run", json, inputs_json, granted, interrupt_after]` — runs the same
-      definition with `Troupe.run/3` on an in-memory store. `granted` is the
-      list of capability names the user ticked; nothing is granted by
+    * `["init"]` — examples (with Elixir source, JSON text, sample inputs and
+      grants) and the installed capability catalog
+    * `["validate", format, text]` — canonical Elixir and JSON, a node
+      outline and required capabilities, or every error with its JSON pointer
+      and, when known, its source line (`details.line`)
+    * `["run", format, text, inputs_json, granted, interrupt_after]` — runs
+      the definition with `Troupe.run/3` on an in-memory store. `granted` is
+      the list of capability names the user ticked; nothing is granted by
       loading or editing. `interrupt_after > 0` kills the run process after
       that many completed activations, like a crash
     * `["resume", run_id, granted]` — resumes an interrupted or failed run
-    * `["export", json, format]` — `"json"`, `"etf"` (base64 term binary) or
-      `"elixir"` (code to load the export in an app)
+    * `["export", format, text, as]` — `as` is `"json"`, `"elixir"` (DSL
+      module source), `"source"` (a bare `workflow do ... end` block, used to
+      switch the editor's format), `"etf"` (base64 term binary) or `"app"`
+      (code to load the export in an app)
 
   Run replies include the output, per-activation steps with their stored
   results, the event history, loop states and store statistics.
@@ -28,6 +34,7 @@ defmodule Troupe.Playground do
 
   alias Troupe.{Binary, Definition, Error, Examples, Grant, JSON, Registry, Store}
   alias Troupe.Definition.{Action, Branch, Loop}
+  alias Troupe.Workflow.Source
 
   @name :troupe_playground
 
@@ -40,7 +47,13 @@ defmodule Troupe.Playground do
 
   @impl true
   def handle_call(["init"], _from, state) do
-    examples = Enum.map(Examples.all(), &Map.put(&1, "json", Examples.json(&1["id"])))
+    examples =
+      Enum.map(Examples.all(), fn example ->
+        Map.merge(example, %{
+          "json" => Examples.json(example["id"]),
+          "elixir" => Examples.source(example["id"])
+        })
+      end)
 
     reply(state, %{
       "ok" => true,
@@ -50,15 +63,18 @@ defmodule Troupe.Playground do
     })
   end
 
-  def handle_call(["validate", json], _from, state) do
-    case JSON.decode(json) do
-      {:ok, definition} -> reply(state, Map.merge(%{"ok" => true}, describe(definition)))
-      {:error, errors} -> reply(state, failure(errors))
+  def handle_call(["validate", format, text], _from, state) do
+    case decode(format, text) do
+      {:ok, definition} ->
+        reply(state, Map.merge(%{"ok" => true}, describe(definition, source_lines(format, text))))
+
+      {:error, errors} ->
+        reply(state, failure(errors))
     end
   end
 
-  def handle_call(["run", json, inputs_json, granted, interrupt_after], from, state) do
-    with {:ok, definition} <- JSON.decode(json),
+  def handle_call(["run", format, text, inputs_json, granted, interrupt_after], from, state) do
+    with {:ok, definition} <- decode(format, text),
          {:ok, inputs} <- decode_inputs(inputs_json),
          {:ok, grant} <- grant(granted) do
       run_id = "play-" <> Integer.to_string(System.unique_integer([:positive]))
@@ -81,10 +97,10 @@ defmodule Troupe.Playground do
     end
   end
 
-  def handle_call(["export", json, format], _from, state) do
-    case JSON.decode(json) do
+  def handle_call(["export", format, text, as], _from, state) do
+    case decode(format, text) do
       {:ok, definition} ->
-        reply(state, %{"ok" => true, "format" => format, "content" => export(definition, format)})
+        reply(state, %{"ok" => true, "format" => as, "content" => export(definition, as)})
 
       {:error, errors} ->
         reply(state, failure(errors))
@@ -254,26 +270,44 @@ defmodule Troupe.Playground do
     end
   end
 
-  defp describe(definition) do
+  defp describe(definition, lines) do
     %{
       "id" => definition.id,
       "version" => definition.version,
       "json" => JSON.encode(definition),
+      "elixir" => Source.to_source(definition),
       "outline" => outline(definition.nodes, 0),
       "capabilities" =>
         definition
         |> Definition.capabilities()
         |> Enum.map(&%{"name" => &1.name, "version" => &1.version}),
-      "check" => check(definition)
+      "check" => check(definition, lines)
     }
   end
 
-  defp check(definition) do
+  # Capability problems carry JSON pointers; for DSL source, add their lines.
+  defp check(definition, lines) do
     case Troupe.check(definition) do
       :ok -> []
-      {:error, errors} -> Enum.map(errors, &Error.to_map/1)
+      {:error, errors} -> Enum.map(errors, &(&1 |> with_line(lines) |> Error.to_map()))
     end
   end
+
+  defp with_line(error, lines) do
+    case Source.line_for(error.path, lines) do
+      nil -> error
+      line -> %{error | details: Map.put(error.details, "line", line)}
+    end
+  end
+
+  defp source_lines("elixir", text) do
+    case Source.parse_with_lines(text) do
+      {:ok, _definition, lines} -> lines
+      {:error, _errors, lines} -> lines
+    end
+  end
+
+  defp source_lines(_format, _text), do: %{}
 
   defp outline(nodes, depth) do
     Enum.flat_map(nodes, fn node ->
@@ -307,12 +341,27 @@ defmodule Troupe.Playground do
 
   defp export(definition, "json"), do: JSON.encode(definition)
   defp export(definition, "etf"), do: Base.encode64(Binary.encode(definition))
+  defp export(definition, "source"), do: Source.to_source(definition)
 
   defp export(definition, "elixir") do
+    module = definition.id |> String.replace(~r/[^a-z0-9_]/, "_") |> Macro.camelize()
+    body = definition |> Source.to_source() |> String.trim_trailing() |> indent()
+
+    """
+    defmodule MyApp.Workflows.#{module} do
+      use Troupe.Workflow
+
+    #{body}
+    end
+    """
+  end
+
+  defp export(definition, "app") do
     caps = definition |> Definition.capabilities() |> Enum.map(& &1.name) |> Enum.uniq()
 
     """
-    # Save the JSON export as priv/workflows/#{definition.id}.json, then:
+    # Either compile the "Elixir module" export into the app, or save the JSON
+    # export as priv/workflows/#{definition.id}.json and load it:
     definition = Troupe.JSON.decode!(File.read!("priv/workflows/#{definition.id}.json"))
 
     # Loading grants nothing; the app decides what may run:
@@ -323,7 +372,23 @@ defmodule Troupe.Playground do
   end
 
   defp export(_definition, format),
-    do: "unknown export format #{inspect(format)}; use json, etf or elixir"
+    do: "unknown export format #{inspect(format)}; use json, elixir, source, etf or app"
+
+  defp indent(text),
+    do: text |> String.split("\n") |> Enum.map_join("\n", &if(&1 == "", do: "", else: "  " <> &1))
+
+  defp decode("json", text), do: JSON.decode(text)
+  defp decode("elixir", text), do: Source.parse(text)
+
+  defp decode(format, _text),
+    do:
+      {:error,
+       [
+         Error.new(
+           :decode_failed,
+           "unknown definition format #{inspect(format)}; use elixir or json"
+         )
+       ]}
 
   defp decode_inputs(json) do
     case Jason.decode(json) do

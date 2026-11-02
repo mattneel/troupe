@@ -6,6 +6,7 @@
     <title>Troupe playground</title>
     <link rel="stylesheet" href="./style.css" />
     <script src="./coi-serviceworker.js"></script>
+    <script src="./vendor/monaco/vs/loader.js"></script>
   </head>
   <body>
     <header>
@@ -20,21 +21,28 @@
         <select id="example" disabled></select>
         <p id="example-source" class="hint"></p>
 
-        <label for="definition">Workflow JSON (edit freely; loading or editing grants nothing)</label>
-        <textarea id="definition" spellcheck="false" rows="24"></textarea>
+        <div class="format-bar" role="radiogroup" aria-label="Authoring format">
+          <label><input type="radio" name="format" id="fmt-elixir" value="elixir" checked disabled /> Elixir DSL</label>
+          <label><input type="radio" name="format" id="fmt-json" value="json" disabled /> JSON</label>
+          <span class="hint">Both decode to the same definition. Elixir source is parsed with
+            <code>Code.string_to_quoted</code> and never evaluated. Loading or editing grants nothing.</span>
+        </div>
+
+        <div id="editor" aria-label="Workflow source editor"></div>
 
         <div class="buttons">
           <button id="validate" disabled>Validate</button>
-          <button id="canonical" disabled>Canonicalize</button>
+          <button id="canonical" disabled>Format / canonicalize</button>
         </div>
 
         <div id="validation" aria-live="polite"></div>
 
         <h3>Export</h3>
         <div class="buttons">
-          <button id="export-json" disabled>Download JSON</button>
+          <button id="export-elixir" disabled>Elixir module</button>
+          <button id="export-json" disabled>JSON</button>
           <button id="export-etf" disabled>Term binary (base64)</button>
-          <button id="export-elixir" disabled>Use in an app</button>
+          <button id="export-app" disabled>Use in an app</button>
         </div>
         <pre id="export-output" class="output"></pre>
       </section>

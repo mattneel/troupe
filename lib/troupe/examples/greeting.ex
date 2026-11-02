@@ -7,19 +7,19 @@ defmodule Troupe.Examples.Greeting do
   use Troupe.Workflow
 
   workflow do
-    id("greeting")
-    version("1.0.0")
+    id "greeting"
+    version "1.0.0"
     description "Shouts a name and greets it."
-    inputs(name: :string, punctuation: [type: :string, required: false, default: "!"])
-    output(result(:greet))
+    inputs name: :string, punctuation: [type: :string, required: false, default: "!"]
+    output result(:greet)
 
     action :shout, "text.upcase", "~> 1.0" do
-      arg(:text, input(:name))
+      arg :text, input(:name)
     end
 
     action :greet, "text.template", "~> 1.0" do
-      arg(:template, value("Hello, {{name}}{{punctuation}}"))
-      arg(:vars, object(name: result(:shout), punctuation: input(:punctuation)))
+      arg :template, value("Hello, {{name}}{{punctuation}}")
+      arg :vars, object(name: result(:shout), punctuation: input(:punctuation))
     end
   end
 end

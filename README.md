@@ -243,18 +243,34 @@ mix troupe.resume --store tmp/runs --run-id sqrt-1 --grant 'math.*'   # complete
 ## Playground (Popcorn)
 
 `playground/` is a browser UI running Troupe itself on the BEAM compiled to
-WebAssembly. With it you can:
+WebAssembly. Live at <https://mattneel.github.io/troupe/>. With it you can:
 
-- load the examples
-- edit the JSON and validate it, with located errors
+- edit workflows in a Monaco editor, as Elixir DSL source or as JSON, and
+  switch between the two views (each switch converts through the VM)
+- validate as you type, with errors marked on their lines
 - tick the capabilities to grant
 - run on real Reactor, then inspect steps, loop states, store statistics and
   history
 - interrupt a run after N completions and resume it
-- export JSON, a term binary, or snippet code for an app
+- export an Elixir module (compiles with the real Spark DSL), JSON, a term
+  binary, or snippet code for an app
+
+The Spark examples open as their actual source files. DSL source is never
+compiled in the browser: `Troupe.Workflow.Source` parses it with
+`Code.string_to_quoted/2` (atoms encoded as strings, so no atoms are
+created) and walks the AST, accepting only DSL forms, expression helpers and
+literals. Anything else, such as `System.cmd(...)`, is rejected with its
+line. The same module is safe to use on a server for untrusted DSL text:
+
+```elixir
+{:ok, definition} = Troupe.Workflow.Source.parse(File.read!("lib/troupe/examples/greeting.ex"))
+definition == Troupe.Examples.Greeting.definition()   #=> true
+Troupe.Workflow.Source.to_source(definition)          # formatted DSL source
+```
 
 ```sh
 ./playground/build.sh          # cooks into playground/out (needs OTP 29, see below)
+./playground/vendor.sh         # vendors Monaco 0.57.0 into playground/vendor (same-origin, for COEP)
 node playground/serve.mjs 4010 # serves with the COOP/COEP headers Popcorn needs
 # open http://127.0.0.1:4010/            (interactive)
 # open http://127.0.0.1:4010/?selftest   (scripted check; body[data-selftest] becomes "pass")
@@ -276,7 +292,7 @@ under **Settings → Pages → Build and deployment → Source: GitHub Actions**
 The build job:
 
 1. installs OTP 29 and Elixir 1.20.2
-2. runs `playground/build.sh`, then `playground/site.sh _site`
+2. runs `playground/build.sh` and `playground/vendor.sh`, then `playground/site.sh _site`
 3. serves `_site` with a plain static server (no special headers, like Pages)
    and runs `playground/selftest.mjs`, which drives `?selftest` in headless
    Chrome
@@ -289,7 +305,7 @@ supplies those headers client-side: the first visit installs it and reloads
 once. To reproduce the CI check locally:
 
 ```sh
-./playground/build.sh && ./playground/site.sh tmp/_site
+./playground/build.sh && ./playground/vendor.sh && ./playground/site.sh tmp/_site
 python3 -m http.server 4032 --directory tmp/_site &
 node playground/selftest.mjs http://127.0.0.1:4032/   # CHROME_PATH=... if Chrome is not on PATH
 ```

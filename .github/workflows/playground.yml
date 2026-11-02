@@ -53,6 +53,9 @@ jobs:
       - name: Cook Troupe for the browser
         run: ./playground/build.sh
 
+      - name: Vendor the Monaco editor
+        run: ./playground/vendor.sh
+
       - name: Assemble site
         run: ./playground/site.sh _site
 

@@ -97,3 +97,27 @@ th {
   list-style: none;
   padding: 0;
 }
+
+#editor {
+  border: 1px solid var(--border);
+  height: 32rem;
+  margin-top: 0.5rem;
+}
+
+.format-bar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.format-bar label {
+  display: inline;
+  margin: 0;
+}
+
+.errors .jump {
+  cursor: pointer;
+  text-decoration: underline dotted;
+}

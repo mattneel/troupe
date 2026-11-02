@@ -65,6 +65,28 @@ defmodule Troupe.Examples do
   @spec json(String.t()) :: String.t()
   def json(id), do: Map.fetch!(@json, id)
 
+  @spark_dir Path.expand("examples", __DIR__)
+
+  for {id, _module} <- @spark do
+    @external_resource Path.join(@spark_dir, id <> ".ex")
+  end
+
+  @sources Map.new(@spark, fn {id, _module} ->
+             {id, File.read!(Path.join(@spark_dir, id <> ".ex"))}
+           end)
+
+  @doc """
+  Elixir DSL source of an example: the real module file for `spark`
+  examples, otherwise rendered from the JSON by `Troupe.Workflow.Source`.
+  """
+  @spec source(String.t()) :: String.t()
+  def source(id) do
+    case Map.fetch(@sources, id) do
+      {:ok, source} -> source
+      :error -> Troupe.Workflow.Source.to_source(definition(id))
+    end
+  end
+
   @doc """
   The definition of an example: from its Spark module for `spark` examples,
   otherwise decoded from its JSON file.

@@ -12,60 +12,63 @@ defmodule Troupe.Examples.CalculatorAgent do
   use Troupe.Workflow
 
   workflow do
-    id("calculator_agent")
-    version("1.0.0")
+    id "calculator_agent"
+    version "1.0.0"
     description "ReAct-style loop that applies a plan of math tools to a starting value."
 
-    inputs(
-      start: :number,
-      plan: :list,
-      keep: [type: :integer, required: false, default: 3, description: "Scratchpad window size."]
-    )
+    inputs start: :number,
+           plan: :list,
+           keep: [
+             type: :integer,
+             required: false,
+             default: 3,
+             description: "Scratchpad window size."
+           ]
 
-    output(result(:agent))
+    output result(:agent)
 
     loop :agent do
       max_iterations 20
-      state(object(value: input(:start), scratchpad: value([])))
-      next_state(object(value: result(:act), scratchpad: result(:note)))
-      until(result(:decide, [:done]))
+      state object(value: input(:start), scratchpad: value([]))
+      next_state object(value: result(:act), scratchpad: result(:note))
+      until result(:decide, [:done])
 
       action :decide, "agent.scripted_policy", "~> 1.0" do
-        arg(:plan, input(:plan))
-        arg(:step, loop_index(:agent))
-        arg(:value, loop_state(:agent, [:value]))
+        arg :plan, input(:plan)
+        arg :step, loop_index(:agent)
+        arg :value, loop_state(:agent, [:value])
       end
 
       branch :act do
         on result(:decide, [:tool])
 
         match "add" do
-          output(result(:add))
+          output result(:add)
 
           action :add, "math.add", "~> 1.0" do
-            arg(:a, loop_state(:agent, [:value]))
-            arg(:b, result(:decide, [:operand]))
+            arg :a, loop_state(:agent, [:value])
+            arg :b, result(:decide, [:operand])
           end
         end
 
         match "multiply" do
-          output(result(:multiply))
+          output result(:multiply)
 
           action :multiply, "math.multiply", "~> 1.0" do
-            arg(:a, loop_state(:agent, [:value]))
-            arg(:b, result(:decide, [:operand]))
+            arg :a, loop_state(:agent, [:value])
+            arg :b, result(:decide, [:operand])
           end
         end
 
         default do
-          output(loop_state(:agent, [:value]))
+          output loop_state(:agent, [:value])
         end
       end
 
       action :note, "list.append_window", "~> 1.0" do
-        arg(:list, loop_state(:agent, [:scratchpad]))
-        arg(:item, object(thought: result(:decide, [:thought]), observation: result(:act)))
-        arg(:keep, input(:keep))
+        arg :list, loop_state(:agent, [:scratchpad])
+        arg :item, object(thought: result(:decide, [:thought]), observation: result(:act))
+        arg :keep, input(:keep)
       end
     end
   end
